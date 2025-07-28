@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google OAuth Test</h1>
+        <p>Testing Google Sign-In with your Client ID</p>
+        
+        <div id="g_id_onload"
+             data-client_id="522966423715-bqcif1to9hreso1ulf1q6tifh0rh1mt3.apps.googleusercontent.com"
+             data-context="signin"
+             data-ux_mode="popup"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+        
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left">
+        </div>
+        
+        <div id="status"></div>
+        <div id="userInfo" style="display: none;">
+            <h3>User Information:</h3>
+            <p id="userDetails"></p>
+        </div>
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            console.log("Google Sign-In successful!");
+            
+            // Decode the JWT token
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            
+            document.getElementById('status').innerHTML = 
+                '<div class="status success">✅ Google Sign-In successful!</div>';
+            
+            document.getElementById('userDetails').innerHTML = `
+                <strong>Name:</strong> ${payload.name}<br>
+                <strong>Email:</strong> ${payload.email}<br>
+                <strong>Picture:</strong> <img src="${payload.picture}" width="50" height="50" style="border-radius: 50%;">
+            `;
+            
+            document.getElementById('userInfo').style.display = 'block';
+        }
+
+        // Check if Google Identity Services loaded
+        window.addEventListener('load', function() {
+            if (window.google && window.google.accounts) {
+                document.getElementById('status').innerHTML = 
+                    '<div class="status success">✅ Google Identity Services loaded successfully</div>';
+            } else {
+                document.getElementById('status').innerHTML = 
+                    '<div class="status error">❌ Google Identity Services failed to load</div>';
+            }
+        });
+    </script>
+</body>
+</html> 
