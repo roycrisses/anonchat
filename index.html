@@ -1733,7 +1733,8 @@
                 const customId = 'CUS' + String(Date.now()).slice(-6);
                 
                 // Get the current username from the input field (this is what the user actually entered)
-                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const usernameInput = document.getElementById('usernameInput');
+                const currentUsername = usernameInput ? usernameInput.value.trim() : '';
                 const creatorName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : 'Anonymous');
                 
                 console.log('Creating environment with creator:', creatorName);
@@ -1774,7 +1775,8 @@
                 newCard.dataset.environment = environmentId;
                 
                 // Check if user is the creator
-                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const usernameInput = document.getElementById('usernameInput');
+                const currentUsername = usernameInput ? usernameInput.value.trim() : '';
                 const currentUserName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : null);
                 const isCreator = environment.creator === currentUserName;
                 const isCustom = environment.isCustom;
@@ -1864,7 +1866,8 @@
                 }
 
                 // Check if user is the creator
-                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const usernameInput = document.getElementById('usernameInput');
+                const currentUsername = usernameInput ? usernameInput.value.trim() : '';
                 const currentUserName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : null);
                 console.log('Trying to delete environment:', environment.name);
                 console.log('Username from input:', currentUsername);
