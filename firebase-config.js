@@ -209,10 +209,45 @@ class FirebaseChat {
             console.error('Error cleaning up messages:', error);
         }
     }
+
+    // Clean up entire environment (delete all messages and users)
+    async cleanupEnvironment(environmentId) {
+        try {
+            console.log(`Cleaning up environment: ${environmentId}`);
+            
+            // Delete all messages
+            const messagesRef = firebase.firestore.collection(db, 'environments', environmentId, 'messages');
+            const messagesSnapshot = await firebase.firestore.getDocs(messagesRef);
+            const messagesBatch = firebase.firestore.writeBatch(db);
+            messagesSnapshot.docs.forEach((doc) => {
+                messagesBatch.delete(doc.ref);
+            });
+            await messagesBatch.commit();
+            
+            // Delete all users
+            const usersRef = firebase.firestore.collection(db, 'environments', environmentId, 'users');
+            const usersSnapshot = await firebase.firestore.getDocs(usersRef);
+            const usersBatch = firebase.firestore.writeBatch(db);
+            usersSnapshot.docs.forEach((doc) => {
+                usersBatch.delete(doc.ref);
+            });
+            await usersBatch.commit();
+            
+            console.log(`Environment ${environmentId} cleaned up successfully`);
+        } catch (error) {
+            console.error('Error cleaning up environment:', error);
+        }
+    }
 }
 
 // Initialize Firebase Chat
 const firebaseChat = new FirebaseChat();
 
 // Export for use in other files
-window.firebaseChat = firebaseChat; 
+window.firebaseChat = firebaseChat;
+
+// Ensure it's available globally
+if (typeof window !== 'undefined') {
+    window.firebaseChat = firebaseChat;
+    console.log('Firebase Chat initialized successfully');
+} 

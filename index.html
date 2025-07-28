@@ -590,6 +590,40 @@
             border-radius: 4px;
         }
 
+        .environment-stats .environment-creator {
+            color: #dc2626;
+            font-size: 0.7rem;
+            font-weight: 500;
+            background: rgba(220, 38, 38, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .delete-environment-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(220, 38, 38, 0.8);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        .delete-environment-btn:hover {
+            background: rgba(220, 38, 38, 1);
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(220, 38, 38, 0.4);
+        }
+
         /* Back Button */
         .back-button {
             background: rgba(50, 50, 50, 0.8);
@@ -1442,6 +1476,7 @@
                 this.generateRandomUsername();
                 this.simulateActivity();
                 this.checkLoginStatus();
+                this.checkExpiredEnvironments();
             }
 
             bindEvents() {
@@ -1591,7 +1626,10 @@
                     desc: desc,
                     created: new Date(),
                     messageCount: 0,
-                    activeUsers: 0
+                    activeUsers: 0,
+                    creator: this.currentUser || 'Anonymous',
+                    isCustom: true,
+                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
                 };
 
                 this.environments[environmentId] = newEnvironment;
@@ -1600,6 +1638,11 @@
                 
                 // Auto-transfer to the new environment
                 this.selectEnvironment(environmentId);
+                
+                // Schedule auto-deletion after 24 hours
+                setTimeout(() => {
+                    this.autoDeleteEnvironment(environmentId);
+                }, 24 * 60 * 60 * 1000);
             }
 
             addEnvironmentCard(environmentId, environment) {
@@ -1608,13 +1651,19 @@
                 newCard.className = 'environment-card';
                 newCard.dataset.environment = environmentId;
                 
+                // Check if user is the creator
+                const isCreator = environment.creator === this.currentUser;
+                const isCustom = environment.isCustom;
+                
                 newCard.innerHTML = `
                     <div class="environment-icon">${environment.icon}</div>
                     <h3>${environment.name}</h3>
                     <p>${environment.desc}</p>
                     <div class="environment-stats">
                         <span class="environment-id">ID: ${environment.id}</span>
+                        ${isCustom ? `<span class="environment-creator">Created by: ${environment.creator}</span>` : ''}
                     </div>
+                    ${isCreator && isCustom ? `<button class="delete-environment-btn" onclick="event.stopPropagation(); chatApp.deleteEnvironment('${environmentId}')">🗑️</button>` : ''}
                 `;
                 
                 // Insert before the "Create New" card
@@ -1674,6 +1723,107 @@
                         <div class="search-result-id">${result.id}</div>
                     </div>
                 `).join('');
+            }
+
+            deleteEnvironment(environmentId) {
+                const environment = this.environments[environmentId];
+                
+                if (!environment) {
+                    alert('Environment not found');
+                    return;
+                }
+
+                // Check if user is the creator
+                if (environment.creator !== this.currentUser) {
+                    alert('Only the creator can delete this environment');
+                    return;
+                }
+
+                // Check if it's a custom environment
+                if (!environment.isCustom) {
+                    alert('Cannot delete base environments');
+                    return;
+                }
+
+                // Confirm deletion
+                if (!confirm(`Are you sure you want to delete "${environment.name}"? This action cannot be undone.`)) {
+                    return;
+                }
+
+                // Remove from environments object
+                delete this.environments[environmentId];
+
+                // Remove from DOM
+                const card = document.querySelector(`[data-environment="${environmentId}"]`);
+                if (card) {
+                    card.remove();
+                }
+
+                // If currently in this environment, go back to environments list
+                if (this.currentEnvironment === environmentId) {
+                    this.showEnvironments();
+                }
+
+                // Clean up Firebase data
+                if (window.firebaseChat) {
+                    window.firebaseChat.cleanupEnvironment(environmentId);
+                }
+
+                alert(`Environment "${environment.name}" has been deleted successfully.`);
+            }
+
+            autoDeleteEnvironment(environmentId) {
+                const environment = this.environments[environmentId];
+                
+                if (!environment || !environment.isCustom) {
+                    return; // Don't delete base environments
+                }
+
+                // Remove from environments object
+                delete this.environments[environmentId];
+
+                // Remove from DOM
+                const card = document.querySelector(`[data-environment="${environmentId}"]`);
+                if (card) {
+                    card.remove();
+                }
+
+                // If currently in this environment, go back to environments list
+                if (this.currentEnvironment === environmentId) {
+                    this.showEnvironments();
+                    this.addSystemMessage('This environment has expired and been automatically deleted.');
+                }
+
+                // Clean up Firebase data
+                if (window.firebaseChat) {
+                    window.firebaseChat.cleanupEnvironment(environmentId);
+                }
+
+                console.log(`Environment "${environment.name}" has been automatically deleted after 24 hours.`);
+            }
+
+            checkExpiredEnvironments() {
+                const now = new Date();
+                const expiredEnvironments = [];
+                
+                Object.keys(this.environments).forEach(environmentId => {
+                    const environment = this.environments[environmentId];
+                    if (environment.isCustom && environment.expiresAt) {
+                        const expiryDate = new Date(environment.expiresAt);
+                        if (now > expiryDate) {
+                            expiredEnvironments.push(environmentId);
+                        }
+                    }
+                });
+                
+                // Delete expired environments
+                expiredEnvironments.forEach(environmentId => {
+                    this.autoDeleteEnvironment(environmentId);
+                });
+                
+                if (expiredEnvironments.length > 0) {
+                    console.log(`Cleaned up ${expiredEnvironments.length} expired environments`);
+                }
             }
 
             checkLoginStatus() {
@@ -1820,11 +1970,26 @@
                 
                 if (!content) return;
 
-                // Send real message to Firebase
-                if (window.firebaseChat) {
-                    await window.firebaseChat.sendMessage(content);
-                } else {
-                    // Fallback to simulated message
+                try {
+                    // Send real message to Firebase
+                    if (window.firebaseChat && window.firebaseChat.sendMessage) {
+                        console.log('Sending message via Firebase:', content);
+                        await window.firebaseChat.sendMessage(content);
+                    } else {
+                        console.log('Firebase not available, using fallback');
+                        // Fallback to simulated message
+                        const message = {
+                            id: Date.now(),
+                            username: this.currentUser,
+                            content: content,
+                            timestamp: new Date(),
+                            isOwn: true
+                        };
+                        this.addMessage(message);
+                    }
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    // Fallback to simulated message on error
                     const message = {
                         id: Date.now(),
                         username: this.currentUser,
@@ -2169,7 +2334,12 @@
         let chatApp;
         document.addEventListener('DOMContentLoaded', () => {
             initializeGoogleSignIn();
-            chatApp = new AnonymousChat();
+            // Small delay to ensure Firebase is loaded
+            setTimeout(() => {
+                chatApp = new AnonymousChat();
+                // Make chatApp available globally for Firebase
+                window.chatApp = chatApp;
+            }, 100);
         });
     </script>
 </body>
