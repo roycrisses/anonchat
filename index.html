@@ -1627,7 +1627,7 @@
                     created: new Date(),
                     messageCount: 0,
                     activeUsers: 0,
-                    creator: this.currentUser || 'Anonymous',
+                    creator: this.currentUser || (this.userProfile ? this.userProfile.name : 'Anonymous'),
                     isCustom: true,
                     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
                 };
@@ -1652,8 +1652,15 @@
                 newCard.dataset.environment = environmentId;
                 
                 // Check if user is the creator
-                const isCreator = environment.creator === this.currentUser;
+                const currentUserName = this.currentUser || (this.userProfile ? this.userProfile.name : null);
+                const isCreator = environment.creator === currentUserName;
                 const isCustom = environment.isCustom;
+                
+                console.log('Creating card for:', environment.name);
+                console.log('Is custom:', isCustom);
+                console.log('Is creator:', isCreator);
+                console.log('Current user:', currentUserName);
+                console.log('Environment creator:', environment.creator);
                 
                 newCard.innerHTML = `
                     <div class="environment-icon">${environment.icon}</div>
@@ -1663,7 +1670,7 @@
                         <span class="environment-id">ID: ${environment.id}</span>
                         ${isCustom ? `<span class="environment-creator">Created by: ${environment.creator}</span>` : ''}
                     </div>
-                    ${isCreator && isCustom ? `<button class="delete-environment-btn" onclick="event.stopPropagation(); chatApp.deleteEnvironment('${environmentId}')">🗑️</button>` : ''}
+                    ${isCreator && isCustom ? `<button class="delete-environment-btn" onclick="event.stopPropagation(); chatApp.deleteEnvironment('${environmentId}')" title="Delete Environment">🗑️</button>` : ''}
                 `;
                 
                 // Insert before the "Create New" card
@@ -1734,7 +1741,8 @@
                 }
 
                 // Check if user is the creator
-                if (environment.creator !== this.currentUser) {
+                const currentUserName = this.currentUser || (this.userProfile ? this.userProfile.name : null);
+                if (environment.creator !== currentUserName) {
                     alert('Only the creator can delete this environment');
                     return;
                 }
