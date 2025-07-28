@@ -624,6 +624,105 @@
             box-shadow: 0 5px 15px rgba(220, 38, 38, 0.4);
         }
 
+        /* Modern Modal Styles */
+        .modern-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modern-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modern-modal-content {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border: 2px solid #3b82f6;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            transform: scale(0.8);
+            transition: all 0.3s ease;
+            box-shadow: 0 20px 40px rgba(220, 38, 38, 0.3);
+        }
+
+        .modern-modal.show .modern-modal-content {
+            transform: scale(1);
+        }
+
+        .modern-modal-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .modern-modal-title {
+            color: #e5e7eb;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .modern-modal-message {
+            color: #9ca3af;
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+
+        .modern-modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 100px;
+        }
+
+        .modal-btn-primary {
+            background: linear-gradient(45deg, #dc2626, #3b82f6);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+        }
+
+        .modal-btn-secondary {
+            background: rgba(60, 60, 60, 0.8);
+            color: #e5e7eb;
+            border: 2px solid #3b82f6;
+        }
+
+        .modal-btn-secondary:hover {
+            background: rgba(80, 80, 80, 0.9);
+            border-color: #dc2626;
+            transform: translateY(-2px);
+        }
+
         /* Back Button */
         .back-button {
             background: rgba(50, 50, 50, 0.8);
@@ -1403,6 +1502,19 @@
         </div>
     </div>
 
+    <!-- Modern Modal Container -->
+    <div class="modern-modal" id="modernModal">
+        <div class="modern-modal-content">
+            <div class="modern-modal-icon" id="modalIcon">⚠️</div>
+            <h3 class="modern-modal-title" id="modalTitle">Title</h3>
+            <p class="modern-modal-message" id="modalMessage">Message</p>
+            <div class="modern-modal-buttons" id="modalButtons">
+                <button class="modal-btn modal-btn-secondary" id="modalCancelBtn">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="modalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         class AnonymousChat {
             constructor() {
@@ -1517,7 +1629,7 @@
                 addNewButton.addEventListener('click', () => this.showCreateEnvironmentModal());
                 backButton.addEventListener('click', () => this.showEnvironmentsList());
                 cancelCreateButton.addEventListener('click', () => this.hideCreateEnvironmentModal());
-                createEnvironmentButton.addEventListener('click', () => this.createNewEnvironment());
+                createEnvironmentButton.addEventListener('click', async () => await this.createNewEnvironment());
 
                 // Login functionality
                 guestButton.addEventListener('click', () => this.handleGuestLogin());
@@ -1608,12 +1720,12 @@
                 this.selectedEmoji = emojiOption.dataset.emoji;
             }
 
-            createNewEnvironment() {
+            async createNewEnvironment() {
                 const name = document.getElementById('environmentNameInput').value.trim();
                 const desc = document.getElementById('environmentDescInput').value.trim();
                 
                 if (!name || !desc) {
-                    alert('Please fill in both name and description');
+                    await this.showErrorModal('Please fill in both name and description');
                     return;
                 }
 
@@ -1675,7 +1787,7 @@
                         <span class="environment-id">ID: ${environment.id}</span>
                         ${isCustom ? `<span class="environment-creator">Created by: ${environment.creator}</span>` : ''}
                     </div>
-                    ${isCreator && isCustom ? `<button class="delete-environment-btn" onclick="event.stopPropagation(); chatApp.deleteEnvironment('${environmentId}')" title="Delete Environment">🗑️</button>` : ''}
+                    ${isCreator && isCustom ? `<button class="delete-environment-btn" onclick="event.stopPropagation(); chatApp.deleteEnvironment('${environmentId}').catch(console.error)" title="Delete Environment">🗑️</button>` : ''}
                 `;
                 
                 // Insert before the "Create New" card
@@ -1737,11 +1849,11 @@
                 `).join('');
             }
 
-            deleteEnvironment(environmentId) {
+            async deleteEnvironment(environmentId) {
                 const environment = this.environments[environmentId];
                 
                 if (!environment) {
-                    alert('Environment not found');
+                    await this.showErrorModal('Environment not found');
                     return;
                 }
 
@@ -1753,18 +1865,26 @@
                 console.log('Are they equal?', environment.creator === currentUserName);
                 
                 if (environment.creator !== currentUserName) {
-                    alert(`Only the creator can delete this environment. You are: ${currentUserName}, Creator is: ${environment.creator}`);
+                    await this.showErrorModal(`Only the creator can delete this environment.\n\nYou are: ${currentUserName}\nCreator is: ${environment.creator}`);
                     return;
                 }
 
                 // Check if it's a custom environment
                 if (!environment.isCustom) {
-                    alert('Cannot delete base environments');
+                    await this.showErrorModal('Cannot delete base environments');
                     return;
                 }
 
                 // Confirm deletion
-                if (!confirm(`Are you sure you want to delete "${environment.name}"? This action cannot be undone.`)) {
+                const confirmed = await this.showModal(
+                    'Delete Environment',
+                    `Are you sure you want to delete "${environment.name}"?\n\nThis action cannot be undone and all messages will be permanently deleted.`,
+                    '🗑️',
+                    'Delete',
+                    'Cancel'
+                );
+                
+                if (!confirmed) {
                     return;
                 }
 
@@ -1787,7 +1907,7 @@
                     window.firebaseChat.cleanupEnvironment(environmentId);
                 }
 
-                alert(`Environment "${environment.name}" has been deleted successfully.`);
+                await this.showSuccessModal(`Environment "${environment.name}" has been deleted successfully.`);
             }
 
             autoDeleteEnvironment(environmentId) {
@@ -1842,6 +1962,66 @@
                 if (expiredEnvironments.length > 0) {
                     console.log(`Cleaned up ${expiredEnvironments.length} expired environments`);
                 }
+            }
+
+            // Modern Modal Methods
+            showModal(title, message, icon = '⚠️', confirmText = 'Confirm', cancelText = 'Cancel') {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('modernModal');
+                    const modalIcon = document.getElementById('modalIcon');
+                    const modalTitle = document.getElementById('modalTitle');
+                    const modalMessage = document.getElementById('modalMessage');
+                    const confirmBtn = document.getElementById('modalConfirmBtn');
+                    const cancelBtn = document.getElementById('modalCancelBtn');
+
+                    modalIcon.textContent = icon;
+                    modalTitle.textContent = title;
+                    modalMessage.textContent = message;
+                    confirmBtn.textContent = confirmText;
+                    cancelBtn.textContent = cancelText;
+
+                    modal.classList.add('show');
+
+                    const handleConfirm = () => {
+                        modal.classList.remove('show');
+                        cleanup();
+                        resolve(true);
+                    };
+
+                    const handleCancel = () => {
+                        modal.classList.remove('show');
+                        cleanup();
+                        resolve(false);
+                    };
+
+                    const cleanup = () => {
+                        confirmBtn.removeEventListener('click', handleConfirm);
+                        cancelBtn.removeEventListener('click', handleCancel);
+                        modal.removeEventListener('click', handleModalClick);
+                    };
+
+                    const handleModalClick = (e) => {
+                        if (e.target === modal) {
+                            handleCancel();
+                        }
+                    };
+
+                    confirmBtn.addEventListener('click', handleConfirm);
+                    cancelBtn.addEventListener('click', handleCancel);
+                    modal.addEventListener('click', handleModalClick);
+                });
+            }
+
+            showSuccessModal(message) {
+                this.showModal('Success!', message, '✅', 'OK');
+            }
+
+            showErrorModal(message) {
+                this.showModal('Error', message, '❌', 'OK');
+            }
+
+            showInfoModal(message) {
+                this.showModal('Information', message, 'ℹ️', 'OK');
             }
 
             checkLoginStatus() {
