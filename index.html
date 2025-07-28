@@ -2351,13 +2351,25 @@
         // Initialize the chat when page loads
         let chatApp;
         document.addEventListener('DOMContentLoaded', () => {
-            initializeGoogleSignIn();
-            // Small delay to ensure Firebase is loaded
-            setTimeout(() => {
-                chatApp = new AnonymousChat();
-                // Make chatApp available globally for Firebase
-                window.chatApp = chatApp;
-            }, 100);
+            try {
+                initializeGoogleSignIn();
+                // Small delay to ensure Firebase is loaded
+                setTimeout(() => {
+                    try {
+                        chatApp = new AnonymousChat();
+                        // Make chatApp available globally for Firebase
+                        window.chatApp = chatApp;
+                        console.log('Chat app initialized successfully');
+                    } catch (error) {
+                        console.error('Error initializing chat app:', error);
+                        // Fallback initialization
+                        chatApp = new AnonymousChat();
+                        window.chatApp = chatApp;
+                    }
+                }, 100);
+            } catch (error) {
+                console.error('Error in DOMContentLoaded:', error);
+            }
         });
     </script>
 </body>

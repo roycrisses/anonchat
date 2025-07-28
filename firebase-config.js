@@ -241,13 +241,23 @@ class FirebaseChat {
 }
 
 // Initialize Firebase Chat
-const firebaseChat = new FirebaseChat();
+try {
+    const firebaseChat = new FirebaseChat();
 
-// Export for use in other files
-window.firebaseChat = firebaseChat;
-
-// Ensure it's available globally
-if (typeof window !== 'undefined') {
+    // Export for use in other files
     window.firebaseChat = firebaseChat;
-    console.log('Firebase Chat initialized successfully');
+
+    // Ensure it's available globally
+    if (typeof window !== 'undefined') {
+        window.firebaseChat = firebaseChat;
+        console.log('Firebase Chat initialized successfully');
+    }
+} catch (error) {
+    console.error('Error initializing Firebase Chat:', error);
+    // Create a fallback Firebase chat object
+    window.firebaseChat = {
+        sendMessage: () => console.log('Firebase not available'),
+        joinEnvironment: () => console.log('Firebase not available'),
+        cleanupEnvironment: () => console.log('Firebase not available')
+    };
 } 
