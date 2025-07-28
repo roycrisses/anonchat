@@ -238,6 +238,118 @@ class FirebaseChat {
             console.error('Error cleaning up environment:', error);
         }
     }
+
+    // Environment Management Methods
+    async createEnvironment(environmentData) {
+        try {
+            const environment = {
+                ...environmentData,
+                createdAt: firebase.firestore.serverTimestamp(),
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+                isCustom: true
+            };
+
+            const docRef = await firebase.firestore.addDoc(
+                firebase.firestore.collection(db, 'environments'),
+                environment
+            );
+
+            console.log('Environment created with ID:', docRef.id);
+            return docRef.id;
+        } catch (error) {
+            console.error('Error creating environment:', error);
+            throw error;
+        }
+    }
+
+    async deleteEnvironment(environmentId) {
+        try {
+            // Delete the environment document
+            await firebase.firestore.deleteDoc(
+                firebase.firestore.doc(db, 'environments', environmentId)
+            );
+
+            // Clean up associated data
+            await this.cleanupEnvironment(environmentId);
+            
+            console.log(`Environment ${environmentId} deleted successfully`);
+        } catch (error) {
+            console.error('Error deleting environment:', error);
+            throw error;
+        }
+    }
+
+    async getEnvironments() {
+        try {
+            const environmentsRef = firebase.firestore.collection(db, 'environments');
+            const snapshot = await firebase.firestore.getDocs(environmentsRef);
+            
+            const environments = {};
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                // Check if environment has expired
+                if (data.expiresAt && new Date(data.expiresAt.toDate()) > new Date()) {
+                    environments[doc.id] = {
+                        ...data,
+                        id: doc.id
+                    };
+                }
+            });
+            
+            return environments;
+        } catch (error) {
+            console.error('Error getting environments:', error);
+            return {};
+        }
+    }
+
+    listenForEnvironments(callback) {
+        try {
+            const environmentsRef = firebase.firestore.collection(db, 'environments');
+            
+            return firebase.firestore.onSnapshot(environmentsRef, (snapshot) => {
+                const environments = {};
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    // Check if environment has expired
+                    if (data.expiresAt && new Date(data.expiresAt.toDate()) > new Date()) {
+                        environments[doc.id] = {
+                            ...data,
+                            id: doc.id
+                        };
+                    }
+                });
+                
+                callback(environments);
+            });
+        } catch (error) {
+            console.error('Error listening for environments:', error);
+        }
+    }
+
+    async cleanupExpiredEnvironments() {
+        try {
+            const environmentsRef = firebase.firestore.collection(db, 'environments');
+            const snapshot = await firebase.firestore.getDocs(environmentsRef);
+            
+            const now = new Date();
+            const batch = firebase.firestore.writeBatch(db);
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.expiresAt && new Date(data.expiresAt.toDate()) < now) {
+                    batch.delete(doc.ref);
+                    // Also clean up associated data
+                    this.cleanupEnvironment(doc.id);
+                }
+            });
+            
+            await batch.commit();
+            console.log('Expired environments cleaned up');
+        } catch (error) {
+            console.error('Error cleaning up expired environments:', error);
+        }
+    }
 }
 
 // Initialize Firebase Chat

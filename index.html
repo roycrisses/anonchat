@@ -1524,62 +1524,7 @@
                 this.currentEnvironment = null;
                 this.isLoggedIn = false;
                 this.userProfile = null;
-                this.environments = {
-                    geopolitics: { 
-                        id: 'GEO001', 
-                        name: 'Geo Politics', 
-                        icon: '🌍', 
-                        desc: 'Global affairs & political discussions',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    },
-                    science: { 
-                        id: 'SCI002', 
-                        name: 'Science', 
-                        icon: '🔬', 
-                        desc: 'Scientific discoveries & research',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    },
-                    education: { 
-                        id: 'EDU003', 
-                        name: 'Education', 
-                        icon: '📚', 
-                        desc: 'Learning & academic discussions',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    },
-                    programming: { 
-                        id: 'PRO004', 
-                        name: 'Programming', 
-                        icon: '💻', 
-                        desc: 'Code, tech & development',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    },
-                    'social-media': { 
-                        id: 'SOC005', 
-                        name: 'Social Media', 
-                        icon: '📱', 
-                        desc: 'Trends & digital culture',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    },
-                    memes: { 
-                        id: 'MEM006', 
-                        name: 'Memes', 
-                        icon: '😂', 
-                        desc: 'Humor & viral content',
-                        created: new Date('2024-01-01'),
-                        messageCount: 0,
-                        activeUsers: 0
-                    }
-                };
+                this.environments = {};
                 this.init();
             }
 
@@ -1588,7 +1533,7 @@
                 this.generateRandomUsername();
                 this.simulateActivity();
                 this.checkLoginStatus();
-                this.checkExpiredEnvironments();
+                this.loadEnvironments();
             }
 
             bindEvents() {
@@ -1729,7 +1674,6 @@
                     return;
                 }
 
-                const environmentId = 'custom-' + Date.now();
                 const customId = 'CUS' + String(Date.now()).slice(-6);
                 
                 // Get the current username from the input field (this is what the user actually entered)
@@ -1742,7 +1686,7 @@
                 console.log('this.currentUser:', this.currentUser);
                 console.log('this.userProfile:', this.userProfile);
                 
-                const newEnvironment = {
+                const environmentData = {
                     id: customId,
                     name: name,
                     icon: this.selectedEmoji,
@@ -1750,22 +1694,36 @@
                     created: new Date(),
                     messageCount: 0,
                     activeUsers: 0,
-                    creator: creatorName,
-                    isCustom: true,
-                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+                    creator: creatorName
                 };
 
-                this.environments[environmentId] = newEnvironment;
-                this.addEnvironmentCard(environmentId, newEnvironment);
-                this.hideCreateEnvironmentModal();
-                
-                // Auto-transfer to the new environment
-                this.selectEnvironment(environmentId);
-                
-                // Schedule auto-deletion after 24 hours
-                setTimeout(() => {
-                    this.autoDeleteEnvironment(environmentId);
-                }, 24 * 60 * 60 * 1000);
+                try {
+                    // Create environment in Firebase
+                    if (window.firebaseChat) {
+                        const environmentId = await window.firebaseChat.createEnvironment(environmentData);
+                        console.log('Environment created in Firebase with ID:', environmentId);
+                        
+                        // The environment will be added to the UI through the real-time listener
+                        this.hideCreateEnvironmentModal();
+                        
+                        // Auto-transfer to the new environment
+                        this.selectEnvironment(environmentId);
+                    } else {
+                        // Fallback to local storage
+                        const environmentId = 'custom-' + Date.now();
+                        this.environments[environmentId] = {
+                            ...environmentData,
+                            isCustom: true,
+                            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                        };
+                        this.addEnvironmentCard(environmentId, this.environments[environmentId]);
+                        this.hideCreateEnvironmentModal();
+                        this.selectEnvironment(environmentId);
+                    }
+                } catch (error) {
+                    console.error('Error creating environment:', error);
+                    await this.showErrorModal('Failed to create environment. Please try again.');
+                }
             }
 
             addEnvironmentCard(environmentId, environment) {
@@ -1899,26 +1857,31 @@
                     return;
                 }
 
-                // Remove from environments object
-                delete this.environments[environmentId];
+                try {
+                    // Delete from Firebase
+                    if (window.firebaseChat) {
+                        await window.firebaseChat.deleteEnvironment(environmentId);
+                    }
 
-                // Remove from DOM
-                const card = document.querySelector(`[data-environment="${environmentId}"]`);
-                if (card) {
-                    card.remove();
+                    // Remove from local environments object
+                    delete this.environments[environmentId];
+
+                    // Remove from DOM
+                    const card = document.querySelector(`[data-environment="${environmentId}"]`);
+                    if (card) {
+                        card.remove();
+                    }
+
+                    // If currently in this environment, go back to environments list
+                    if (this.currentEnvironment === environmentId) {
+                        this.showEnvironments();
+                    }
+
+                    await this.showSuccessModal(`Environment "${environment.name}" has been deleted successfully.`);
+                } catch (error) {
+                    console.error('Error deleting environment:', error);
+                    await this.showErrorModal('Failed to delete environment. Please try again.');
                 }
-
-                // If currently in this environment, go back to environments list
-                if (this.currentEnvironment === environmentId) {
-                    this.showEnvironments();
-                }
-
-                // Clean up Firebase data
-                if (window.firebaseChat) {
-                    window.firebaseChat.cleanupEnvironment(environmentId);
-                }
-
-                await this.showSuccessModal(`Environment "${environment.name}" has been deleted successfully.`);
             }
 
             autoDeleteEnvironment(environmentId) {
@@ -2033,6 +1996,107 @@
 
             showInfoModal(message) {
                 this.showModal('Information', message, 'ℹ️', 'OK');
+            }
+
+            async loadEnvironments() {
+                try {
+                    // Load base environments
+                    const baseEnvironments = {
+                        geopolitics: { 
+                            id: 'GEO001', 
+                            name: 'Geo Politics', 
+                            icon: '🌍', 
+                            desc: 'Global affairs & political discussions',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        },
+                        science: { 
+                            id: 'SCI002', 
+                            name: 'Science', 
+                            icon: '🔬', 
+                            desc: 'Scientific discoveries & research',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        },
+                        education: { 
+                            id: 'EDU003', 
+                            name: 'Education', 
+                            icon: '📚', 
+                            desc: 'Learning & academic discussions',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        },
+                        programming: { 
+                            id: 'PRO004', 
+                            name: 'Programming', 
+                            icon: '💻', 
+                            desc: 'Code, tech & development',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        },
+                        'social-media': { 
+                            id: 'SOC005', 
+                            name: 'Social Media', 
+                            icon: '📱', 
+                            desc: 'Trends & digital culture',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        },
+                        memes: { 
+                            id: 'MEM006', 
+                            name: 'Memes', 
+                            icon: '😂', 
+                            desc: 'Humor & viral content',
+                            created: new Date('2024-01-01'),
+                            messageCount: 0,
+                            activeUsers: 0,
+                            isCustom: false
+                        }
+                    };
+
+                    // Start with base environments
+                    this.environments = { ...baseEnvironments };
+
+                    // Load custom environments from Firebase
+                    if (window.firebaseChat) {
+                        // Get initial environments
+                        const customEnvironments = await window.firebaseChat.getEnvironments();
+                        Object.assign(this.environments, customEnvironments);
+
+                        // Listen for real-time updates
+                        this.environmentsListener = window.firebaseChat.listenForEnvironments((customEnvironments) => {
+                            // Update custom environments while keeping base environments
+                            Object.keys(this.environments).forEach(key => {
+                                if (this.environments[key].isCustom) {
+                                    delete this.environments[key];
+                                }
+                            });
+                            Object.assign(this.environments, customEnvironments);
+                            
+                            // Refresh the UI if we're on the environments screen
+                            if (document.getElementById('environmentsScreen').style.display !== 'none') {
+                                this.showEnvironments();
+                            }
+                        });
+
+                        // Clean up expired environments
+                        await window.firebaseChat.cleanupExpiredEnvironments();
+                    }
+
+                    console.log('Environments loaded successfully');
+                } catch (error) {
+                    console.error('Error loading environments:', error);
+                }
             }
 
             checkLoginStatus() {
