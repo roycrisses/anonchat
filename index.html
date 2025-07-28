@@ -37,9 +37,12 @@
     <script type="module">
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, query, getDocs, writeBatch, offset } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         
+        // Initialize Firebase App and expose it globally
+        const app = initializeApp(firebaseConfig);
+        window.firebaseApp = app;
         // Make Firebase available globally
         window.firebase = {
             initializeApp,
@@ -57,8 +60,7 @@
                 deleteDoc,
                 query,
                 getDocs,
-                writeBatch,
-                offset
+                writeBatch
             }
         };
     </script>

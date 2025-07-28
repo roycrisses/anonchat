@@ -1,21 +1,24 @@
-// Firebase Configuration
-// Your actual Firebase config from Firebase Console
-const firebaseConfig = {
-    apiKey: "AIzaSyBdIADVjCsEMOb4Ek0UOcHfmkqL5hI_x7Q",
-    authDomain: "anonchat-app-46eda.firebaseapp.com",
-    projectId: "anonchat-app-46eda",
-    storageBucket: "anonchat-app-46eda.firebasestorage.app",
-    messagingSenderId: "872870716820",
-    appId: "1:872870716820:web:89599886b291ee8b5cdb81",
-    measurementId: "G-2J3DGTHLW3"
-};
+// firebase-config.js
 
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
+// Use the modular SDK functions from window.firebase
+const {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    orderBy,
+    limit,
+    serverTimestamp,
+    doc,
+    setDoc,
+    deleteDoc,
+    query,
+    getDocs,
+    writeBatch
+} = window.firebase.firestore;
 
-// Initialize services
-const db = firebase.getFirestore(app);
-const auth = firebase.getAuth(app);
+// Use the app instance from window.firebaseApp (set in index.html)
+const db = getFirestore(window.firebaseApp);
 
 // Real-time chat functionality
 class FirebaseChat {
@@ -33,18 +36,18 @@ class FirebaseChat {
         this.currentUser = username;
 
         // Add user to active users
-        await firebase.firestore.setDoc(
-            firebase.firestore.doc(db, 'environments', environmentId, 'users', username),
+        await setDoc(
+            doc(db, 'environments', environmentId, 'users', username),
             {
                 username: username,
-                joinedAt: firebase.firestore.serverTimestamp(),
-                lastSeen: firebase.firestore.serverTimestamp()
+                joinedAt: serverTimestamp(),
+                lastSeen: serverTimestamp()
             }
         );
 
         // Listen for messages in this environment
         this.listenForMessages(environmentId);
-        
+
         // Listen for active users
         this.listenForActiveUsers(environmentId);
 
@@ -56,17 +59,13 @@ class FirebaseChat {
     async leaveEnvironment() {
         if (this.currentEnvironment && this.currentUser) {
             // Remove user from active users
-            await firebase.firestore.deleteDoc(
-                firebase.firestore.doc(db, 'environments', this.currentEnvironment, 'users', this.currentUser)
+            await deleteDoc(
+                doc(db, 'environments', this.currentEnvironment, 'users', this.currentUser)
             );
 
             // Stop listeners
-            if (this.messagesListener) {
-                this.messagesListener();
-            }
-            if (this.usersListener) {
-                this.usersListener();
-            }
+            if (this.messagesListener) this.messagesListener();
+            if (this.usersListener) this.usersListener();
 
             this.currentEnvironment = null;
             this.currentUser = null;
@@ -80,13 +79,13 @@ class FirebaseChat {
         const message = {
             content: content,
             username: this.currentUser,
-            timestamp: firebase.firestore.serverTimestamp(),
+            timestamp: serverTimestamp(),
             environment: this.currentEnvironment
         };
 
         try {
-            await firebase.firestore.addDoc(
-                firebase.firestore.collection(db, 'environments', this.currentEnvironment, 'messages'),
+            await addDoc(
+                collection(db, 'environments', this.currentEnvironment, 'messages'),
                 message
             );
         } catch (error) {
@@ -96,38 +95,33 @@ class FirebaseChat {
 
     // Listen for real messages
     listenForMessages(environmentId) {
-        const messagesRef = firebase.firestore.collection(db, 'environments', environmentId, 'messages');
-        const q = firebase.firestore.query(
-            messagesRef,
-            firebase.firestore.orderBy('timestamp', 'asc'),
-            firebase.firestore.limit(50)
-        );
-        
-        this.messagesListener = firebase.firestore.onSnapshot(q, (snapshot) => {
+        const messagesRef = collection(db, 'environments', environmentId, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'), limit(50));
+        if (this.messagesListener) this.messagesListener();
+        this.messagesListener = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === 'added') {
-                    const message = {
-                        id: change.doc.id,
-                        ...change.doc.data()
-                    };
-                    this.displayMessage(message);
+                    const message = change.doc.data();
+                    if (window.chatApp && window.chatApp.addRealMessage) {
+                        window.chatApp.addRealMessage(message);
+                    }
                 }
             });
-        }, (error) => {
-            console.error('Error listening for messages:', error);
         });
     }
 
     // Listen for active users
     listenForActiveUsers(environmentId) {
-        const usersRef = firebase.firestore.collection(db, 'environments', environmentId, 'users');
-        
-        this.usersListener = firebase.firestore.onSnapshot(usersRef, (snapshot) => {
+        const usersRef = collection(db, 'environments', environmentId, 'users');
+        if (this.usersListener) this.usersListener();
+        this.usersListener = onSnapshot(usersRef, (snapshot) => {
             this.activeUsers.clear();
             snapshot.forEach((doc) => {
                 this.activeUsers.set(doc.id, doc.data());
             });
-            this.updateActiveUsersCount();
+            if (window.chatApp && window.chatApp.updateActiveUsersCount) {
+                window.chatApp.updateActiveUsersCount(this.activeUsers.size);
+            }
         });
     }
 
@@ -136,14 +130,14 @@ class FirebaseChat {
         const message = {
             content: content,
             username: 'System',
-            timestamp: firebase.firestore.serverTimestamp(),
+            timestamp: serverTimestamp(),
             environment: environmentId,
             isSystem: true
         };
 
         try {
-            await firebase.firestore.addDoc(
-                firebase.firestore.collection(db, 'environments', environmentId, 'messages'),
+            await addDoc(
+                collection(db, 'environments', environmentId, 'messages'),
                 message
             );
         } catch (error) {
@@ -151,56 +145,13 @@ class FirebaseChat {
         }
     }
 
-    // Display message in UI
-    displayMessage(message) {
-        // This will be called by the main app
-        if (window.chatApp && window.chatApp.addRealMessage) {
-            window.chatApp.addRealMessage(message);
-        }
-    }
-
-    // Update active users count
-    updateActiveUsersCount() {
-        const count = this.activeUsers.size;
-        // Update UI with real user count
-        if (window.chatApp && window.chatApp.updateActiveUsersCount) {
-            window.chatApp.updateActiveUsersCount(count);
-        }
-    }
-
-    // Get message history
-    async getMessageHistory(environmentId, limit = 50) {
-        try {
-            const messagesRef = firebase.firestore.collection(db, 'environments', environmentId, 'messages');
-            const q = firebase.firestore.query(
-                messagesRef,
-                firebase.firestore.orderBy('timestamp', 'desc'),
-                firebase.firestore.limit(limit)
-            );
-            
-            const snapshot = await firebase.firestore.getDocs(q);
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })).reverse();
-        } catch (error) {
-            console.error('Error getting message history:', error);
-            return [];
-        }
-    }
-
     // Clean up old messages (keep only last 50)
     async cleanupOldMessages(environmentId) {
         try {
-            const messagesRef = firebase.firestore.collection(db, 'environments', environmentId, 'messages');
-            const q = firebase.firestore.query(
-                messagesRef,
-                firebase.firestore.orderBy('timestamp', 'desc'),
-                firebase.firestore.offset(50)
-            );
-            
-            const snapshot = await firebase.firestore.getDocs(q);
-            const batch = firebase.firestore.writeBatch(db);
+            const messagesRef = collection(db, 'environments', environmentId, 'messages');
+            const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(50));
+            const snapshot = await getDocs(q);
+            const batch = writeBatch(db);
             snapshot.docs.forEach((doc) => {
                 batch.delete(doc.ref);
             });
@@ -213,48 +164,39 @@ class FirebaseChat {
     // Clean up entire environment (delete all messages and users)
     async cleanupEnvironment(environmentId) {
         try {
-            console.log(`Cleaning up environment: ${environmentId}`);
-            
             // Delete all messages
-            const messagesRef = firebase.firestore.collection(db, 'environments', environmentId, 'messages');
-            const messagesSnapshot = await firebase.firestore.getDocs(messagesRef);
-            const messagesBatch = firebase.firestore.writeBatch(db);
+            const messagesRef = collection(db, 'environments', environmentId, 'messages');
+            const messagesSnapshot = await getDocs(messagesRef);
+            const messagesBatch = writeBatch(db);
             messagesSnapshot.docs.forEach((doc) => {
                 messagesBatch.delete(doc.ref);
             });
             await messagesBatch.commit();
-            
+
             // Delete all users
-            const usersRef = firebase.firestore.collection(db, 'environments', environmentId, 'users');
-            const usersSnapshot = await firebase.firestore.getDocs(usersRef);
-            const usersBatch = firebase.firestore.writeBatch(db);
+            const usersRef = collection(db, 'environments', environmentId, 'users');
+            const usersSnapshot = await getDocs(usersRef);
+            const usersBatch = writeBatch(db);
             usersSnapshot.docs.forEach((doc) => {
                 usersBatch.delete(doc.ref);
             });
             await usersBatch.commit();
-            
-            console.log(`Environment ${environmentId} cleaned up successfully`);
         } catch (error) {
             console.error('Error cleaning up environment:', error);
         }
     }
 
-    // Environment Management Methods
+    // --- SHARED ENVIRONMENT METHODS ---
+
     async createEnvironment(environmentData) {
         try {
             const environment = {
                 ...environmentData,
-                createdAt: firebase.firestore.serverTimestamp(),
+                createdAt: serverTimestamp(),
                 expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
                 isCustom: true
             };
-
-            const docRef = await firebase.firestore.addDoc(
-                firebase.firestore.collection(db, 'environments'),
-                environment
-            );
-
-            console.log('Environment created with ID:', docRef.id);
+            const docRef = await addDoc(collection(db, 'environments'), environment);
             return docRef.id;
         } catch (error) {
             console.error('Error creating environment:', error);
@@ -264,15 +206,8 @@ class FirebaseChat {
 
     async deleteEnvironment(environmentId) {
         try {
-            // Delete the environment document
-            await firebase.firestore.deleteDoc(
-                firebase.firestore.doc(db, 'environments', environmentId)
-            );
-
-            // Clean up associated data
+            await deleteDoc(doc(db, 'environments', environmentId));
             await this.cleanupEnvironment(environmentId);
-            
-            console.log(`Environment ${environmentId} deleted successfully`);
         } catch (error) {
             console.error('Error deleting environment:', error);
             throw error;
@@ -281,39 +216,20 @@ class FirebaseChat {
 
     async getEnvironments() {
         try {
-            console.log('Getting environments from Firestore...');
-            const environmentsRef = firebase.firestore.collection(db, 'environments');
-            const snapshot = await firebase.firestore.getDocs(environmentsRef);
-            
-            console.log('Snapshot size:', snapshot.size);
-            
+            const environmentsRef = collection(db, 'environments');
+            const snapshot = await getDocs(environmentsRef);
             const environments = {};
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                console.log('Environment data:', doc.id, data);
-                
-                // Check if environment has expired
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
                 if (data.expiresAt) {
-                    const expiryDate = new Date(data.expiresAt.toDate());
-                    const now = new Date();
-                    console.log('Expiry check:', doc.id, 'expires:', expiryDate, 'now:', now, 'isExpired:', expiryDate < now);
-                    
-                    if (expiryDate > now) {
-                        environments[doc.id] = {
-                            ...data,
-                            id: doc.id
-                        };
+                    const expiryDate = new Date(data.expiresAt.toDate ? data.expiresAt.toDate() : data.expiresAt);
+                    if (expiryDate > new Date()) {
+                        environments[docSnap.id] = { ...data, id: docSnap.id };
                     }
                 } else {
-                    // If no expiry date, include it
-                    environments[doc.id] = {
-                        ...data,
-                        id: doc.id
-                    };
+                    environments[docSnap.id] = { ...data, id: docSnap.id };
                 }
             });
-            
-            console.log('Returning environments:', environments);
             return environments;
         } catch (error) {
             console.error('Error getting environments:', error);
@@ -323,38 +239,20 @@ class FirebaseChat {
 
     listenForEnvironments(callback) {
         try {
-            console.log('Setting up environments listener...');
-            const environmentsRef = firebase.firestore.collection(db, 'environments');
-            
-            return firebase.firestore.onSnapshot(environmentsRef, (snapshot) => {
-                console.log('Environments listener triggered, snapshot size:', snapshot.size);
+            const environmentsRef = collection(db, 'environments');
+            return onSnapshot(environmentsRef, (snapshot) => {
                 const environments = {};
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    console.log('Listener - Environment data:', doc.id, data);
-                    
-                    // Check if environment has expired
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
                     if (data.expiresAt) {
-                        const expiryDate = new Date(data.expiresAt.toDate());
-                        const now = new Date();
-                        console.log('Listener - Expiry check:', doc.id, 'expires:', expiryDate, 'now:', now, 'isExpired:', expiryDate < now);
-                        
-                        if (expiryDate > now) {
-                            environments[doc.id] = {
-                                ...data,
-                                id: doc.id
-                            };
+                        const expiryDate = new Date(data.expiresAt.toDate ? data.expiresAt.toDate() : data.expiresAt);
+                        if (expiryDate > new Date()) {
+                            environments[docSnap.id] = { ...data, id: docSnap.id };
                         }
                     } else {
-                        // If no expiry date, include it
-                        environments[doc.id] = {
-                            ...data,
-                            id: doc.id
-                        };
+                        environments[docSnap.id] = { ...data, id: docSnap.id };
                     }
                 });
-                
-                console.log('Listener - Returning environments:', environments);
                 callback(environments);
             });
         } catch (error) {
@@ -364,47 +262,26 @@ class FirebaseChat {
 
     async cleanupExpiredEnvironments() {
         try {
-            const environmentsRef = firebase.firestore.collection(db, 'environments');
-            const snapshot = await firebase.firestore.getDocs(environmentsRef);
-            
+            const environmentsRef = collection(db, 'environments');
+            const snapshot = await getDocs(environmentsRef);
             const now = new Date();
-            const batch = firebase.firestore.writeBatch(db);
-            
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.expiresAt && new Date(data.expiresAt.toDate()) < now) {
-                    batch.delete(doc.ref);
-                    // Also clean up associated data
-                    this.cleanupEnvironment(doc.id);
+            const batch = writeBatch(db);
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                if (data.expiresAt) {
+                    const expiryDate = new Date(data.expiresAt.toDate ? data.expiresAt.toDate() : data.expiresAt);
+                    if (expiryDate < now) {
+                        batch.delete(docSnap.ref);
+                        this.cleanupEnvironment(docSnap.id);
+                    }
                 }
             });
-            
             await batch.commit();
-            console.log('Expired environments cleaned up');
         } catch (error) {
             console.error('Error cleaning up expired environments:', error);
         }
     }
 }
 
-// Initialize Firebase Chat
-try {
-    const firebaseChat = new FirebaseChat();
-
-    // Export for use in other files
-    window.firebaseChat = firebaseChat;
-
-    // Ensure it's available globally
-    if (typeof window !== 'undefined') {
-        window.firebaseChat = firebaseChat;
-        console.log('Firebase Chat initialized successfully');
-    }
-} catch (error) {
-    console.error('Error initializing Firebase Chat:', error);
-    // Create a fallback Firebase chat object
-    window.firebaseChat = {
-        sendMessage: () => console.log('Firebase not available'),
-        joinEnvironment: () => console.log('Firebase not available'),
-        cleanupEnvironment: () => console.log('Firebase not available')
-    };
-} 
+// Export for use in other files
+window.firebaseChat = new FirebaseChat(); 
