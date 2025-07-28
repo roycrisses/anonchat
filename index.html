@@ -1731,8 +1731,13 @@
 
                 const environmentId = 'custom-' + Date.now();
                 const customId = 'CUS' + String(Date.now()).slice(-6);
-                const creatorName = this.currentUser || (this.userProfile ? this.userProfile.name : 'Anonymous');
+                
+                // Get the current username from the input field (this is what the user actually entered)
+                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const creatorName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : 'Anonymous');
+                
                 console.log('Creating environment with creator:', creatorName);
+                console.log('Username from input:', currentUsername);
                 console.log('this.currentUser:', this.currentUser);
                 console.log('this.userProfile:', this.userProfile);
                 
@@ -1769,7 +1774,8 @@
                 newCard.dataset.environment = environmentId;
                 
                 // Check if user is the creator
-                const currentUserName = this.currentUser || (this.userProfile ? this.userProfile.name : null);
+                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const currentUserName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : null);
                 const isCreator = environment.creator === currentUserName;
                 const isCustom = environment.isCustom;
                 
@@ -1858,8 +1864,10 @@
                 }
 
                 // Check if user is the creator
-                const currentUserName = this.currentUser || (this.userProfile ? this.userProfile.name : null);
+                const currentUsername = document.getElementById('usernameInput').value.trim();
+                const currentUserName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : null);
                 console.log('Trying to delete environment:', environment.name);
+                console.log('Username from input:', currentUsername);
                 console.log('Current user:', currentUserName);
                 console.log('Environment creator:', environment.creator);
                 console.log('Are they equal?', environment.creator === currentUserName);
