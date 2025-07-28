@@ -1568,7 +1568,7 @@
 
                 // Environment selection
                 environmentCards.forEach(card => {
-                    card.addEventListener('click', () => this.selectEnvironment(card.dataset.environment));
+                    card.addEventListener('click', async () => await this.selectEnvironment(card.dataset.environment));
                 });
 
                 addNewButton.addEventListener('click', () => this.showCreateEnvironmentModal());
@@ -1608,9 +1608,33 @@
                 closeInfoButton.addEventListener('click', () => this.hideEnvironmentInfo());
             }
 
-            selectEnvironment(environmentId) {
-                this.currentEnvironment = environmentId;
+            async selectEnvironment(environmentId) {
                 const environment = this.environments[environmentId];
+                
+                // Check if this is a custom environment and user is not the creator
+                if (environment.isCustom) {
+                    const usernameInput = document.getElementById('usernameInput');
+                    const currentUsername = usernameInput ? usernameInput.value.trim() : '';
+                    const currentUserName = currentUsername || this.currentUser || (this.userProfile ? this.userProfile.name : null);
+                    const isCreator = environment.creator === currentUserName;
+                    
+                    if (!isCreator) {
+                        // Show confirmation popup for non-creators
+                        const confirmed = await this.showModal(
+                            'Join Custom Environment',
+                            `Are you sure you want to join "${environment.name}"?\n\nCreated by: ${environment.creator}\nDescription: ${environment.desc}`,
+                            environment.icon,
+                            'Join',
+                            'Cancel'
+                        );
+                        
+                        if (!confirmed) {
+                            return; // User cancelled
+                        }
+                    }
+                }
+                
+                this.currentEnvironment = environmentId;
                 
                 // Update chat interface
                 document.getElementById('currentEnvironmentTitle').innerHTML = `${environment.icon} ${environment.name}`;
@@ -1761,7 +1785,7 @@
                 grid.insertBefore(newCard, addNewCard);
                 
                 // Add click event
-                newCard.addEventListener('click', () => this.selectEnvironment(environmentId));
+                newCard.addEventListener('click', async () => await this.selectEnvironment(environmentId));
             }
 
             searchEnvironments() {
@@ -1804,7 +1828,7 @@
                 }
 
                 resultsContainer.innerHTML = results.map(result => `
-                    <div class="search-result-item" onclick="chatApp.selectEnvironment('${result.key}')">
+                    <div class="search-result-item" onclick="chatApp.selectEnvironment('${result.key}').catch(console.error)">
                         <div class="search-result-icon">${result.icon}</div>
                         <div class="search-result-info">
                             <div class="search-result-name">${result.name}</div>
