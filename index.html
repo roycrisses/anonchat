@@ -33,6 +33,39 @@
     <!-- Configuration -->
     <script src="config.js"></script>
     
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, query, getDocs, writeBatch, offset } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        
+        // Make Firebase available globally
+        window.firebase = {
+            initializeApp,
+            getFirestore,
+            getAuth,
+            firestore: {
+                collection,
+                addDoc,
+                onSnapshot,
+                orderBy,
+                limit,
+                serverTimestamp,
+                doc,
+                setDoc,
+                deleteDoc,
+                query,
+                getDocs,
+                writeBatch,
+                offset
+            }
+        };
+    </script>
+    
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js"></script>
+    
     <!-- Google OAuth -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
@@ -1762,7 +1795,7 @@
                 document.getElementById('usernameInput').value = `${randomAdj}${randomNoun}${randomNum}`;
             }
 
-            joinChat() {
+            async joinChat() {
                 const username = document.getElementById('usernameInput').value.trim();
                 if (!username) return;
 
@@ -1772,29 +1805,37 @@
                 document.getElementById('sendButton').disabled = false;
                 document.getElementById('messageInput').focus();
 
+                // Join Firebase environment
+                if (window.firebaseChat) {
+                    await window.firebaseChat.joinEnvironment(this.currentEnvironment, username);
+                }
+
                 const environment = this.environments[this.currentEnvironment];
                 this.addSystemMessage(`${username} joined ${environment.name}`);
             }
 
-            sendMessage() {
+            async sendMessage() {
                 const messageInput = document.getElementById('messageInput');
                 const content = messageInput.value.trim();
                 
                 if (!content) return;
 
-                const message = {
-                    id: Date.now(),
-                    username: this.currentUser,
-                    content: content,
-                    timestamp: new Date(),
-                    isOwn: true
-                };
-
-                this.addMessage(message);
-                messageInput.value = '';
+                // Send real message to Firebase
+                if (window.firebaseChat) {
+                    await window.firebaseChat.sendMessage(content);
+                } else {
+                    // Fallback to simulated message
+                    const message = {
+                        id: Date.now(),
+                        username: this.currentUser,
+                        content: content,
+                        timestamp: new Date(),
+                        isOwn: true
+                    };
+                    this.addMessage(message);
+                }
                 
-                // Simulate response from other users
-                setTimeout(() => this.simulateResponse(), Math.random() * 3000 + 1000);
+                messageInput.value = '';
             }
 
             addMessage(message) {
@@ -2039,6 +2080,36 @@
 
             hideEnvironmentInfo() {
                 document.getElementById('environmentInfoModal').style.display = 'none';
+            }
+
+            // Firebase integration methods
+            addRealMessage(message) {
+                const messageEl = document.createElement('div');
+                messageEl.className = `message ${message.username === this.currentUser ? 'own' : ''}`;
+                
+                const timestamp = message.timestamp ? 
+                    (message.timestamp.toDate ? message.timestamp.toDate() : new Date(message.timestamp)) : 
+                    new Date();
+                
+                messageEl.innerHTML = `
+                    <div class="message-header">
+                        <span class="username">${message.username}</span>
+                        <span class="timestamp">${this.formatTime(timestamp)}</span>
+                    </div>
+                    <div class="message-content">${this.escapeHtml(message.content)}</div>
+                `;
+                
+                const messagesContainer = document.getElementById('messagesContainer');
+                messagesContainer.appendChild(messageEl);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            updateActiveUsersCount(count) {
+                // Update UI to show real user count
+                const userCountElement = document.getElementById('activeUsersCount');
+                if (userCountElement) {
+                    userCountElement.textContent = `${count} people online`;
+                }
             }
 
             showStatus(message, type = 'info') {
