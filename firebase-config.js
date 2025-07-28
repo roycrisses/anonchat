@@ -281,14 +281,31 @@ class FirebaseChat {
 
     async getEnvironments() {
         try {
+            console.log('Getting environments from Firestore...');
             const environmentsRef = firebase.firestore.collection(db, 'environments');
             const snapshot = await firebase.firestore.getDocs(environmentsRef);
+            
+            console.log('Snapshot size:', snapshot.size);
             
             const environments = {};
             snapshot.forEach((doc) => {
                 const data = doc.data();
+                console.log('Environment data:', doc.id, data);
+                
                 // Check if environment has expired
-                if (data.expiresAt && new Date(data.expiresAt.toDate()) > new Date()) {
+                if (data.expiresAt) {
+                    const expiryDate = new Date(data.expiresAt.toDate());
+                    const now = new Date();
+                    console.log('Expiry check:', doc.id, 'expires:', expiryDate, 'now:', now, 'isExpired:', expiryDate < now);
+                    
+                    if (expiryDate > now) {
+                        environments[doc.id] = {
+                            ...data,
+                            id: doc.id
+                        };
+                    }
+                } else {
+                    // If no expiry date, include it
                     environments[doc.id] = {
                         ...data,
                         id: doc.id
@@ -296,6 +313,7 @@ class FirebaseChat {
                 }
             });
             
+            console.log('Returning environments:', environments);
             return environments;
         } catch (error) {
             console.error('Error getting environments:', error);
@@ -305,14 +323,30 @@ class FirebaseChat {
 
     listenForEnvironments(callback) {
         try {
+            console.log('Setting up environments listener...');
             const environmentsRef = firebase.firestore.collection(db, 'environments');
             
             return firebase.firestore.onSnapshot(environmentsRef, (snapshot) => {
+                console.log('Environments listener triggered, snapshot size:', snapshot.size);
                 const environments = {};
                 snapshot.forEach((doc) => {
                     const data = doc.data();
+                    console.log('Listener - Environment data:', doc.id, data);
+                    
                     // Check if environment has expired
-                    if (data.expiresAt && new Date(data.expiresAt.toDate()) > new Date()) {
+                    if (data.expiresAt) {
+                        const expiryDate = new Date(data.expiresAt.toDate());
+                        const now = new Date();
+                        console.log('Listener - Expiry check:', doc.id, 'expires:', expiryDate, 'now:', now, 'isExpired:', expiryDate < now);
+                        
+                        if (expiryDate > now) {
+                            environments[doc.id] = {
+                                ...data,
+                                id: doc.id
+                            };
+                        }
+                    } else {
+                        // If no expiry date, include it
                         environments[doc.id] = {
                             ...data,
                             id: doc.id
@@ -320,6 +354,7 @@ class FirebaseChat {
                     }
                 });
                 
+                console.log('Listener - Returning environments:', environments);
                 callback(environments);
             });
         } catch (error) {

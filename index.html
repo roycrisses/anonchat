@@ -2093,12 +2093,19 @@
 
                     // Load custom environments from Firebase
                     if (window.firebaseChat) {
+                        console.log('Loading environments from Firebase...');
+                        
                         // Get initial environments
                         const customEnvironments = await window.firebaseChat.getEnvironments();
+                        console.log('Custom environments from Firebase:', customEnvironments);
+                        
                         Object.assign(this.environments, customEnvironments);
+                        console.log('All environments after merge:', this.environments);
 
                         // Listen for real-time updates
                         this.environmentsListener = window.firebaseChat.listenForEnvironments((customEnvironments) => {
+                            console.log('Real-time update received:', customEnvironments);
+                            
                             // Update custom environments while keeping base environments
                             Object.keys(this.environments).forEach(key => {
                                 if (this.environments[key].isCustom) {
@@ -2107,14 +2114,19 @@
                             });
                             Object.assign(this.environments, customEnvironments);
                             
+                            console.log('Updated environments:', this.environments);
+                            
                             // Refresh the UI if we're on the environments screen
-                            if (document.getElementById('environmentsScreen').style.display !== 'none') {
+                            const environmentsScreen = document.getElementById('environmentsScreen');
+                            if (environmentsScreen && environmentsScreen.style.display !== 'none') {
                                 this.showEnvironments();
                             }
                         });
 
                         // Clean up expired environments
                         await window.firebaseChat.cleanupExpiredEnvironments();
+                    } else {
+                        console.log('Firebase not available, using local environments only');
                     }
 
                     console.log('Environments loaded successfully');
