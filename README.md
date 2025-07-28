@@ -47,6 +47,13 @@ anonchat/
 
 ## 🚀 Quick Start
 
+### Firebase Setup (Required First Step)
+**⚠️ Important:** Before running the app, you need to configure Firebase:
+
+1. **Quick Setup:** See `QUICK_FIREBASE_SETUP.md` for step-by-step instructions
+2. **Update Configuration:** Edit `firebase-config-setup.js` with your Firebase project details
+3. **Test Configuration:** Open `test-config.html` in browser to verify setup
+
 ### Local Development
 
 1. **Clone the repository**
@@ -55,14 +62,16 @@ anonchat/
    cd anonchat
    ```
 
-2. **Start local server**
+2. **Configure Firebase** (see above)
+
+3. **Start local server**
    ```bash
    python -m http.server 8000
    # or
    npx serve .
    ```
 
-3. **Open in browser**
+4. **Open in browser**
    ```
    http://localhost:8000
    ```
