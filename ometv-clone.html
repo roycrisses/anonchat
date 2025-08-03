@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmeTV Clone - Random Video Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            background: rgba(0,0,0,0.8);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            height: 400px;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+            background: #1a1a1a;
+        }
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-next { background: #00b894; color: white; }
+        .btn-stop { background: #e17055; color: white; }
+        .btn-mute { background: rgba(255,255,255,0.2); color: white; }
+        .btn-camera { background: rgba(255,255,255,0.2); color: white; }
+        .btn-mute.muted { background: #e17055; }
+        .btn-camera.off { background: #e17055; }
+        
+        .status.searching { background: rgba(255, 193, 7, 0.2); border: 1px solid #ffc107; }
+        .status.connected { background: rgba(40, 167, 69, 0.2); border: 1px solid #28a745; }
+        .status.ready { background: rgba(255, 255, 255, 0.1); }
+        .login-section {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 OmeTV Clone</h1>
+            <p>Connect with random people via video chat</p>
+        </div>
+
+        <div class="login-section" id="loginSection">
+            <h2>Get Started</h2>
+            <button class="btn btn-next" onclick="handleGoogleLogin()">Continue with Google</button>
+            <button class="btn btn-next" onclick="handleGuestLogin()">Continue as Guest</button>
+        </div>
+
+        <div class="video-container" id="videoChatSection" style="display: none;">
+            <div id="status" style="text-align: center; margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                <h3>Ready to connect</h3>
+                <p>Click "Next" to find someone to chat with</p>
+            </div>
+            <div class="video-grid">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+            <div class="controls">
+                <button class="btn btn-next" id="nextBtn" onclick="findNextUser()">Next</button>
+                <button class="btn btn-stop" id="stopBtn" onclick="stopChat()" style="display: none;">Stop</button>
+                <button class="btn btn-mute" id="muteBtn" onclick="toggleMute()">Mute</button>
+                <button class="btn btn-camera" id="cameraBtn" onclick="toggleCamera()">Camera</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        
+        // Firebase configuration (replace with your actual config)
+        const firebaseConfig = {
+            apiKey: "AIzaSyC...", // Replace with your actual API key
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        window.firebaseApp = app;
+        window.firebase = {
+            firestore: {
+                collection,
+                addDoc,
+                onSnapshot,
+                orderBy,
+                limit,
+                serverTimestamp,
+                doc,
+                setDoc,
+                deleteDoc,
+                query,
+                getDocs,
+                writeBatch
+            }
+        };
+    </script>
+    
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- Configuration -->
+    <script src="config.js"></script>
+
+    <script>
+        class OmeTVClone {
+            constructor() {
+                this.currentUser = null;
+                this.localStream = null;
+                this.peerConnection = null;
+                this.isConnected = false;
+                this.db = null;
+                this.initializeApp();
+            }
+
+            async initializeApp() {
+                while (!window.firebaseChat) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                this.db = window.firebase.firestore();
+                window.handleCredentialResponse = (response) => this.handleGoogleCallback(response);
+            }
+
+            async handleGoogleCallback(response) {
+                try {
+                    const payload = this.decodeJwtResponse(response.credential);
+                    this.currentUser = payload.name;
+                    this.showVideoChat();
+                } catch (error) {
+                    console.error('Google login error:', error);
+                }
+            }
+
+            handleGuestLogin() {
+                this.currentUser = `Guest${Math.floor(Math.random() * 9999)}`;
+                this.showVideoChat();
+            }
+
+            decodeJwtResponse(token) {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            }
+
+            showVideoChat() {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('videoChatSection').style.display = 'block';
+                this.initializeVideo();
+            }
+
+            async initializeVideo() {
+                try {
+                    this.localStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                    document.getElementById('localVideo').srcObject = this.localStream;
+                } catch (error) {
+                    console.error('Error accessing media devices:', error);
+                }
+            }
+
+            async findNextUser() {
+                if (this.isConnected) await this.stopChat();
+                
+                this.updateStatus('Searching for someone to connect with...', 'searching');
+                
+                // Look for existing waiting rooms first
+                const waitingRooms = await this.db.collection('videoChat')
+                    .where('status', '==', 'waiting')
+                    .where('users', 'array-contains', {id: this.currentUser})
+                    .limit(1)
+                    .get();
+                
+                let roomRef;
+                if (!waitingRooms.empty) {
+                    // Join existing room
+                    roomRef = waitingRooms.docs[0].ref;
+                    await roomRef.update({
+                        users: this.db.FieldValue.arrayUnion({
+                            id: this.currentUser,
+                            name: this.currentUser,
+                            timestamp: new Date()
+                        })
+                    });
+                } else {
+                    // Create new room
+                    const roomId = 'room_' + Math.random().toString(36).substr(2, 9);
+                    roomRef = this.db.collection('videoChat').doc(roomId);
+                    await roomRef.set({
+                        users: [{
+                            id: this.currentUser,
+                            name: this.currentUser,
+                            timestamp: new Date()
+                        }],
+                        status: 'waiting',
+                        createdAt: new Date()
+                    });
+                }
+
+                // Listen for room changes
+                this.roomListener = roomRef.onSnapshot((doc) => {
+                    const data = doc.data();
+                    if (!data) return;
+                    
+                    if (data.users && data.users.length === 2 && data.status === 'waiting') {
+                        this.startConnection(roomRef, data);
+                    }
+                });
+            }
+
+            async startConnection(roomRef, roomData) {
+                this.isConnected = true;
+                this.currentRoomRef = roomRef;
+                document.getElementById('nextBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-block';
+                
+                this.updateStatus('Connected! You can now chat.', 'connected');
+                
+                // Update room status
+                await roomRef.update({status: 'connected'});
+                
+                const config = {
+                    iceServers: [
+                        {urls: 'stun:stun.l.google.com:19302'},
+                        {urls: 'stun:stun1.l.google.com:19302'}
+                    ]
+                };
+                
+                this.peerConnection = new RTCPeerConnection(config);
+                
+                // Add local stream tracks
+                this.localStream.getTracks().forEach(track => {
+                    this.peerConnection.addTrack(track, this.localStream);
+                });
+                
+                // Handle incoming stream
+                this.peerConnection.ontrack = (event) => {
+                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                };
+                
+                // Handle ICE candidates
+                this.peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        roomRef.update({
+                            [`candidates.${this.currentUser}`]: event.candidate
+                        });
+                    }
+                };
+                
+                // Determine if we should create offer or answer
+                const otherUser = roomData.users.find(u => u.id !== this.currentUser);
+                if (otherUser) {
+                    this.currentPartner = otherUser;
+                    
+                    // Listen for offer/answer
+                    roomRef.onSnapshot((doc) => {
+                        const data = doc.data();
+                        if (data.offer && data.offerFrom !== this.currentUser) {
+                            this.handleOffer(data.offer);
+                        }
+                        if (data.answer && data.answerFrom !== this.currentUser) {
+                            this.handleAnswer(data.answer);
+                        }
+                        if (data.candidates) {
+                            Object.keys(data.candidates).forEach(userId => {
+                                if (userId !== this.currentUser && data.candidates[userId]) {
+                                    this.peerConnection.addIceCandidate(data.candidates[userId]);
+                                }
+                            });
+                        }
+                    });
+                    
+                    // Create and send offer
+                    const offer = await this.peerConnection.createOffer();
+                    await this.peerConnection.setLocalDescription(offer);
+                    await roomRef.update({
+                        offer: offer,
+                        offerFrom: this.currentUser
+                    });
+                }
+            }
+
+            async handleOffer(offer) {
+                await this.peerConnection.setRemoteDescription(offer);
+                const answer = await this.peerConnection.createAnswer();
+                await this.peerConnection.setLocalDescription(answer);
+                await this.currentRoomRef.update({
+                    answer: answer,
+                    answerFrom: this.currentUser
+                });
+            }
+
+            async handleAnswer(answer) {
+                await this.peerConnection.setRemoteDescription(answer);
+            }
+
+            async stopChat() {
+                this.isConnected = false;
+                
+                // Close peer connection
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null;
+                }
+                
+                // Stop room listener
+                if (this.roomListener) {
+                    this.roomListener();
+                    this.roomListener = null;
+                }
+                
+                // Clean up room
+                if (this.currentRoomRef) {
+                    await this.currentRoomRef.update({
+                        status: 'disconnected',
+                        disconnectedAt: new Date()
+                    });
+                    this.currentRoomRef = null;
+                }
+                
+                // Clear remote video
+                document.getElementById('remoteVideo').srcObject = null;
+                
+                // Reset UI
+                document.getElementById('nextBtn').style.display = 'inline-block';
+                document.getElementById('stopBtn').style.display = 'none';
+                
+                this.updateStatus('Ready to connect', 'ready');
+                
+                this.currentPartner = null;
+            }
+
+            toggleMute() {
+                if (this.localStream) {
+                    const audioTrack = this.localStream.getAudioTracks()[0];
+                    if (audioTrack) {
+                        audioTrack.enabled = !audioTrack.enabled;
+                        const muteBtn = document.getElementById('muteBtn');
+                        if (!audioTrack.enabled) {
+                            muteBtn.textContent = 'Unmute';
+                            muteBtn.classList.add('muted');
+                        } else {
+                            muteBtn.textContent = 'Mute';
+                            muteBtn.classList.remove('muted');
+                        }
+                    }
+                }
+            }
+
+            toggleCamera() {
+                if (this.localStream) {
+                    const videoTrack = this.localStream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        videoTrack.enabled = !videoTrack.enabled;
+                        const cameraBtn = document.getElementById('cameraBtn');
+                        if (!videoTrack.enabled) {
+                            cameraBtn.textContent = 'Camera Off';
+                            cameraBtn.classList.add('off');
+                        } else {
+                            cameraBtn.textContent = 'Camera';
+                            cameraBtn.classList.remove('off');
+                        }
+                    }
+                }
+            }
+
+            updateStatus(message, type) {
+                const status = document.getElementById('status');
+                status.innerHTML = `<h3>${message}</h3>`;
+                status.className = type;
+            }
+        }
+
+        let omeTVApp = new OmeTVClone();
+
+        function handleGoogleLogin() {
+            // Google Sign-In will be handled by callback
+        }
+
+        function handleGuestLogin() {
+            omeTVApp.handleGuestLogin();
+        }
+
+        function findNextUser() {
+            omeTVApp.findNextUser();
+        }
+
+        function stopChat() {
+            omeTVApp.stopChat();
+        }
+
+        function toggleMute() {
+            omeTVApp.toggleMute();
+        }
+
+        function toggleCamera() {
+            omeTVApp.toggleCamera();
+        }
+    </script>
+</body>
+</html> 
