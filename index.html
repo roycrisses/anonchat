@@ -1650,6 +1650,24 @@
                 document.getElementById('messagesContainer').innerHTML = '';
                 this.addSystemMessage(`Welcome to ${environment.name}! Start chatting anonymously.`);
                 
+                // Auto-join for Google users or if username is already set
+                if (this.currentUser) {
+                    // Enable chat input immediately
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendButton').disabled = false;
+                    document.getElementById('messageInput').focus();
+                    
+                    // Join Firebase environment
+                    if (window.firebaseChat) {
+                        await window.firebaseChat.joinEnvironment(this.currentEnvironment, this.currentUser);
+                    }
+                    
+                    this.addSystemMessage(`${this.currentUser} joined ${environment.name}`);
+                } else {
+                    // Show username modal for guest users
+                    document.getElementById('usernameModal').style.display = 'flex';
+                }
+                
                 // Increment active users for this environment
                 if (environment.activeUsers !== undefined) {
                     environment.activeUsers++;
@@ -1660,12 +1678,13 @@
                 document.getElementById('chatContainer').style.display = 'none';
                 document.getElementById('environmentsContainer').style.display = 'block';
                 this.currentEnvironment = null;
-                this.currentUser = null;
                 
                 // Reset chat interface
                 document.getElementById('messageInput').disabled = true;
                 document.getElementById('sendButton').disabled = true;
                 document.getElementById('usernameModal').style.display = 'none';
+                
+                // Don't reset currentUser for Google users - they should keep their anonymous username
             }
 
             showCreateEnvironmentModal() {
@@ -2143,6 +2162,12 @@
                     try {
                         this.userProfile = JSON.parse(savedUser);
                         this.isLoggedIn = true;
+                        
+                        // Restore anonymous username for chat functionality
+                        if (this.userProfile.anonymousUsername) {
+                            this.currentUser = this.userProfile.anonymousUsername;
+                        }
+                        
                         this.showUserInfo();
                         this.showEnvironments();
                     } catch (error) {
@@ -2158,16 +2183,21 @@
                     // Decode the JWT token
                     const payload = JSON.parse(atob(response.credential.split('.')[1]));
                     
+                    // Generate anonymous username for chat
+                    const anonymousUsername = this.generateAnonymousUsername(payload.name);
+                    
                     this.userProfile = {
                         name: payload.name,
                         email: payload.email,
                         picture: payload.picture,
                         id: payload.sub,
                         loginMethod: 'google',
-                        loginTime: new Date().toISOString()
+                        loginTime: new Date().toISOString(),
+                        anonymousUsername: anonymousUsername
                     };
 
                     this.isLoggedIn = true;
+                    this.currentUser = anonymousUsername; // Set for chat functionality
                     localStorage.setItem('anonchat_user', JSON.stringify(this.userProfile));
                     this.showUserInfo();
                     this.showEnvironments();
@@ -2191,6 +2221,8 @@
                 };
 
                 this.isLoggedIn = true;
+                // Guest users will set their username when joining a chat
+                this.currentUser = null;
                 localStorage.setItem('anonchat_user', JSON.stringify(this.userProfile));
                 this.showUserInfo();
                 this.showEnvironments();
@@ -2226,6 +2258,19 @@
                 document.getElementById('userName').textContent = this.userProfile.name;
                 document.getElementById('userEmail').textContent = this.userProfile.email;
                 
+                // Show anonymous username for Google users
+                if (this.userProfile.anonymousUsername) {
+                    const userDetails = document.querySelector('.user-details');
+                    if (userDetails) {
+                        const anonymousInfo = document.createElement('p');
+                        anonymousInfo.style.color = '#3b82f6';
+                        anonymousInfo.style.fontSize = '0.8rem';
+                        anonymousInfo.style.marginTop = '5px';
+                        anonymousInfo.textContent = `Chat as: ${this.userProfile.anonymousUsername}`;
+                        userDetails.appendChild(anonymousInfo);
+                    }
+                }
+                
                 userInfo.style.display = 'flex';
                 loginOptions.style.display = 'none';
             }
@@ -2256,8 +2301,24 @@
                 document.getElementById('usernameInput').value = `${randomAdj}${randomNoun}${randomNum}`;
             }
 
+            generateAnonymousUsername(realName) {
+                const adjectives = ['Cool', 'Mysterious', 'Friendly', 'Clever', 'Bright', 'Swift', 'Bold', 'Quiet', 'Wise', 'Kind'];
+                const nouns = ['Panda', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear', 'Lion', 'Owl', 'Shark', 'Falcon'];
+                const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+                const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+                const randomNum = Math.floor(Math.random() * 999) + 1;
+                
+                return `${randomAdj}${randomNoun}${randomNum}`;
+            }
+
             async joinChat() {
-                const username = document.getElementById('usernameInput').value.trim();
+                let username = document.getElementById('usernameInput').value.trim();
+                
+                // For Google users, use their anonymous username if no input provided
+                if (!username && this.userProfile && this.userProfile.anonymousUsername) {
+                    username = this.userProfile.anonymousUsername;
+                }
+                
                 if (!username) return;
 
                 this.currentUser = username;
