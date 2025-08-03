@@ -1,0 +1,44 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "*.log",
+      "firebase-debug.log",
+      "*.bat",
+      "*.exe",
+      "*.sh",
+      "FIREBASE_SETUP.md",
+      "GOOGLE_OAUTH_SETUP.md",
+      "OAUTH_TROUBLESHOOTING.md",
+      "TEST_SETUP.md",
+      "OMETV_README.md",
+      "VIDCHAT_README.md",
+      "README.md",
+      "QUICK_DEPLOYMENT_GUIDE.md",
+      "FIREBASE_CONFIG_TEMPLATE.md",
+      "FIREBASE_DEPLOYMENT.md",
+      ".git/**",
+      ".vscode/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/vidchat.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      }
+    ]
+  }
+} 

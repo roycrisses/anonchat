@@ -1,5 +1,17 @@
 // firebase-config.js
 
+// Firebase Configuration - Using the same config as AnonChat
+const firebaseConfig = {
+    apiKey: "AIzaSyBdIADVjCsEMOb4Ek0UOcHfmkqL5hI_x7Q",
+    authDomain: "anonchat-app-46eda.firebaseapp.com",
+    databaseURL: "https://anonchat-app-46eda-default-rtdb.firebaseio.com",
+    projectId: "anonchat-app-46eda",
+    storageBucket: "anonchat-app-46eda.firebasestorage.app",
+    messagingSenderId: "872870716820",
+    appId: "1:872870716820:web:89599886b291ee8b5cdb81",
+    measurementId: "G-2J3DGTHLW3"
+};
+
 // Wait for Firebase to be available before initializing
 function initializeFirebaseChat() {
     // Check if Firebase is available

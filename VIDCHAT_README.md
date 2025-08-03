@@ -35,6 +35,7 @@ A fully functional random video chat application built with WebRTC, Firebase, an
 
 ### 3. Run the Application
 
+#### Option A: Local Development
 ```bash
 # Start local server
 python -m http.server 8000
@@ -42,6 +43,26 @@ python -m http.server 8000
 # Open in browser
 http://localhost:8000/vidchat.html
 ```
+
+#### Option B: Firebase Hosting (Recommended)
+```bash
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login to Firebase
+firebase login
+
+# Deploy to Firebase Hosting
+firebase deploy --only hosting
+
+# Your app will be available at:
+# https://your-project-id.web.app
+# https://your-project-id.firebaseapp.com
+```
+
+**Quick Deploy Scripts:**
+- **Windows**: Run `deploy.bat`
+- **Mac/Linux**: Run `./deploy.sh`
 
 ## 🔧 Configuration
 
@@ -174,4 +195,4 @@ For issues and questions:
 
 ---
 
-**Note**: This is a clone for educational purposes. Please respect privacy and use responsibly. 
+**Note**: This is a video chat application for educational purposes. Please respect privacy and use responsibly. 

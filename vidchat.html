@@ -107,18 +107,23 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, query, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         
-        // Firebase configuration (replace with your actual config)
+        // Firebase configuration - using the same config as AnonChat
         const firebaseConfig = {
-            apiKey: "AIzaSyC...", // Replace with your actual API key
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project-id",
-            storageBucket: "your-project.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abc123"
+            apiKey: "AIzaSyBdIADVjCsEMOb4Ek0UOcHfmkqL5hI_x7Q",
+            authDomain: "anonchat-app-46eda.firebaseapp.com",
+            databaseURL: "https://anonchat-app-46eda-default-rtdb.firebaseio.com",
+            projectId: "anonchat-app-46eda",
+            storageBucket: "anonchat-app-46eda.firebasestorage.app",
+            messagingSenderId: "872870716820",
+            appId: "1:872870716820:web:89599886b291ee8b5cdb81",
+            measurementId: "G-2J3DGTHLW3"
         };
         
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Make Firebase available globally
         window.firebaseApp = app;
         window.firebase = {
             firestore: {
@@ -133,7 +138,10 @@
                 deleteDoc,
                 query,
                 getDocs,
-                writeBatch
+                writeBatch,
+                FieldValue: {
+                    arrayUnion: (value) => ({ type: 'arrayUnion', value })
+                }
             }
         };
     </script>
@@ -156,9 +164,7 @@
             }
 
             async initializeApp() {
-                while (!window.firebaseChat) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                // Firebase is already initialized in the module script
                 this.db = window.firebase.firestore();
                 window.handleCredentialResponse = (response) => this.handleGoogleCallback(response);
             }
